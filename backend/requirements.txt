@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pypdf
+python-docx
+langchain
+langchain-community
+google-generativeai
+faiss-cpu
+motor
+python-dotenv
+pytest
+requests
+reportlab
+python-multipart 
