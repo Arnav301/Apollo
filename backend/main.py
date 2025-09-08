@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
+import uvicorn
 import google.generativeai as genai
 from app.routes import upload, query, chat
 
@@ -34,3 +35,7 @@ app.include_router(chat.router)
 @app.get("/")
 def root():
     return {"message": "✅ Apollo Backend is running with MongoDB!"}
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
