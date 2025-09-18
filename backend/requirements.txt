@@ -12,3 +12,4 @@ pytest
 requests
 reportlab
 python-multipart 
+sentence-transformers

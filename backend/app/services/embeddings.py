@@ -1,18 +1,21 @@
-import faiss  # use faiss-cpu on Windows if faiss doesn't install
+# embeddings.py
+# use faiss-cpu on Windows if faiss doesn't install
+import faiss  # pip install faiss-cpu
 import numpy as np
-import google.generativeai as genai
+from sentence_transformers import SentenceTransformer
 from app.db.mongodb import documents_collection
 import os
-
-# Configure Gemini
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Path to FAISS index file
 INDEX_PATH = "vector.index"
 
+# Load HuggingFace embedding model (cached locally after first run)
+# all-MiniLM-L6-v2 → 384 dimensions
+HF_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+
 
 # Load or create FAISS index
-def get_faiss_index(dim=768):  # Gemini embeddings = 768 dimensions
+def get_faiss_index(dim=384):  # HF MiniLM = 384 dims
     if os.path.exists(INDEX_PATH):
         index = faiss.read_index(INDEX_PATH)
     else:
@@ -23,13 +26,10 @@ def get_faiss_index(dim=768):  # Gemini embeddings = 768 dimensions
     return index
 
 
-# Embed text using Gemini
+# Embed text using HuggingFace
 def get_embedding(text: str) -> np.ndarray:
-    response = genai.embed_content(
-        model="models/embedding-001",
-        content=text
-    )
-    return np.array(response["embedding"], dtype=np.float32)
+    embedding = HF_MODEL.encode(text, convert_to_numpy=True)
+    return embedding.astype("float32")
 
 
 # Add new chunks to FAISS + Mongo
@@ -37,12 +37,14 @@ async def add_chunks_to_index(filename: str, chunks: list[str]):
     index = get_faiss_index()
 
     for i, chunk in enumerate(chunks):
+        print(f"Embedding chunk {i} for {filename}") 
         # Generate embedding
         embedding = get_embedding(chunk)
         embedding = np.array([embedding]).astype("float32")
 
         # Assign a vector_id (simple increment = index.ntotal + 1)
         vector_id = index.ntotal + 1
+        print(f"Adding vector_id={vector_id}")
 
         # Insert into FAISS
         index.add_with_ids(embedding, np.array([vector_id], dtype=np.int64))
@@ -87,7 +89,7 @@ async def search_chunks(query: str, k: int = 5):
     return results
 
 
-# Ask Gemini with retrieved chunks
+# Ask Gemini with retrieved chunks (optional: you can swap this later to Llama/other LLM)
 async def answer_with_context(query: str):
     retrieved_docs = await search_chunks(query)
 
@@ -101,6 +103,9 @@ async def answer_with_context(query: str):
     Question: {query}
     """
 
+    # Right now this still uses Gemini for answering,
+    # you can swap to HuggingFace LLM / OpenAI if you want
+    import google.generativeai as genai
     model = genai.GenerativeModel("gemini-1.5-pro")
     response = model.generate_content(prompt)
     return response.text
